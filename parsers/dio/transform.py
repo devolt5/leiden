@@ -16,6 +16,7 @@
 # are represented with named entities (&lt; &gt;).
 #
 #
+import csv
 from pathlib import Path
 
 PROJECT_ROOT = (
@@ -36,7 +37,10 @@ importlib.reload(dioParser)
 #%% Load transcriptions
 
 filename = "dio_public_raw.csv"
-df = pd.read_csv(PROJECT_ROOT / "data" / "input" / filename, delimiter = ',')
+inputfile = PROJECT_ROOT / "data" / "input" / filename
+with inputfile.open(encoding="utf-8-sig", newline="") as file:
+    delimiter = csv.Sniffer().sniff(file.readline(), delimiters=",;").delimiter
+df = pd.read_csv(inputfile, delimiter=delimiter, encoding="utf-8-sig")
 df['case'] = range(1, len(df) + 1)
 
 #%% Preprocess
@@ -86,4 +90,6 @@ df['ok'] = df['parsed'].str.startswith("<document>")
 print(df['ok'].value_counts())
 
 #%% Save result
-df.to_csv(PROJECT_ROOT / "data" / "output" / f"{outputname}.csv", index=False, sep=";")
+outputdir = PROJECT_ROOT / "data" / "output"
+outputdir.mkdir(parents=True, exist_ok=True)
+df.to_csv(outputdir / f"{outputname}.csv", index=False, sep=";")
