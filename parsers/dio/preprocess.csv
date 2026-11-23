@@ -3,7 +3,7 @@ search;replace;cases;comment
 "‎";"";;Remove LRM marker
 " ";" ";338,80;Replace nbsp
 …;...;64;Replace three dots by three dots
-[∙∙ˑ‧∙⋅ꞏ◦];·;;Unify middle dots
+[∙∙ˑ‧∙⋅ꞏ◦▪];·;;Unify middle dots
 <sub>:</sub>;·̣;112;Unify combining dot below
 "&#x323;";̣;;Unify combining dot below
 °;<sup>o</sup>;;Replace degree
@@ -25,3 +25,4 @@ search;replace;cases;comment
 "</sup>\)";")</sup>";459;Correct probable markup errors around footnote markers (narrower scope for HTML cleanup)
 "<sup><sup>";")<sup>";;Correct redundant footnote markers markup (opening tags)
 "</sup></sup>";"</sup>";;Correct redundant footnote markers markup (closing tags)
+"\feff";"";;Remove stray byte-order marker
