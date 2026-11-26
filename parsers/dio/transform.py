@@ -65,6 +65,9 @@ with open(DIO_ROOT / "tests" / f"{outputname}.ini", "w", encoding="utf-8") as fi
 
 grammarpath = DIO_ROOT / "dio.ebnf"
 dioParser.recompile_grammar(str(grammarpath), force=True)
+import importlib
+
+importlib.reload(dioParser)
 
 #%% Parse all dio sco
 
