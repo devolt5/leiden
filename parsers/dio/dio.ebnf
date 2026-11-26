@@ -27,11 +27,13 @@
 document       = sco+ §EOF
 
 sco            = prettyspace `<sco>` prettyspace sec+ `</sco>` prettyspace translation?
-sec            = `<sec>` prettyspace ( snt | snr )* ( ( par | pin ) translation? )* `</sec>` prettyspace
+sec            = `<sec>` prettyspace ( snt | snr | par | pce | table | pin | translation | nl prettyspace )* `</sec>` prettyspace
+# Neu: par, pce, table, pin, translation und <nl/> sind direkt in <sec> erlaubt (vorher nur snt/snr sowie par/pin mit optionaler translation). Grund: Tabellen und Container ohne <par>-Umschluss führten zu Fehlern (Code 1040).
 
 #snr            = `<snr>` /[A-Z0-9]+/ "."? letters_cross? prettyspace `</snr>` prettyspace
 #snr         = `<snr>` /[^<]+/ `</snr>` prettyspace
-snr         = `<snr>` ( prettyspace span_txt prettyspace | /[^<]+/ ) `</snr>` prettyspace
+snr         = ( `<snr>` ( span_txt | app | sup | nl | /[^<]+/ )* `</snr>` | `<snr/>` ) prettyspace
+# Neu: <snr> darf span_txt, app, sup, nl und Text beliebig mischen; leeres <snr/> ist erlaubt. Grund: Solche Inhalte und leere Nummern (<snr/> kommt in den Rohdaten 259× vor) führten zu Fehlern.
 
 
 #snt         = `<snt>` prettyspace /(?:(?!<\/snt>)[\w .:,;()<>\/])+/ prettyspace `</snt>` prettyspace
@@ -39,21 +41,29 @@ snt            = `<snt>` (prettyspace (b | span_txt) prettyspace | /[^<]+/) `</s
 
 b              = `<b>` ( prettyspace versal prettyspace | /[^<]+/ ) `</b>`
 
-par            = `<par>` prettyspace (lno | lin | lce | table | pin)+ `</par>` prettyspace
+par            = `<par>` prettyspace (lno | lin | lce | lri | pin | nl prettyspace | table)+ `</par>` prettyspace
+# Neu: lri und nl sind als Kinder erlaubt. Grund: <lri> (33× in den Rohdaten) war in <par> nicht zulässig.
+pin            = `<pin>` prettyspace (lno | lin | lce | lri | lou | nl prettyspace)+ `</pin>` prettyspace
+# Ersetzt die alte pin-Definition (vorher weiter unten, nach lou). Neu: lri und nl erlaubt, inscription als direktes Kind entfernt. Vermutlich, weil freier Text jetzt über <pce> abgedeckt wird (Grund nicht sicher rekonstruierbar).
+pce            = `<pce>` prettyspace (lno | lin | lce | lri | inscription | nl prettyspace)+ `</pce>` prettyspace
+# Neu: Container wie <pin>, zusätzlich mit freiem Text (inscription). Grund: <pce> kommt in den Rohdaten vor und war bisher nicht definiert.
 
 lno            = `<lno>` cnt? § inscription `</lno>` prettyspace
 lin            = `<lin>` cnt? § inscription `</lin>` prettyspace
 lce            = `<lce>` § inscription `</lce>` prettyspace
-
-lou            = `<lou>` § inscription `</lou>` prettyspace
-pin            = `<pin>` prettyspace ( lno | lin | lce | lou | inscription )+ `</pin>` prettyspace
+lri            = `<lri>` § inscription `</lri>` prettyspace
+# Neu: Zeilentag analog zu <lce>. Grund: <lri> (33× in den Rohdaten) war unbekannt und führte zu Fehlern. Die Bedeutung (vermutlich rechtsbündige Zeile) ist im Repo nicht dokumentiert.
+lou            = `<lou>` ( inscription | /[^<]+/ ) `</lou>` prettyspace
+# Geändert: ohne § und mit Alternative für reinen Text. Grund: § erzwang bei abweichendem Inhalt sofort einen Fehler; ohne § kann der Parser zurückspringen, Freitext in <lou> wird akzeptiert.
 
 cnt            = `<cnt>` /[0-9]+/ `</cnt>`
 
 table  = `<table>` prettyspace row+ `</table>` prettyspace
 row    = `<row>` prettyspace cell+ `</row>` prettyspace
-cell   = `<cell>` prettyspace entry+ `</cell>` prettyspace
-entry  = `<entry>` § inscription `</entry>` prettyspace
+cell   = ( `<cell>` prettyspace ( entry | lno | lin | lce | lri | snr | inscription )* prettyspace `</cell>` | `<cell/>` ) prettyspace
+# Geändert: Zelle darf leer sein (<cell/>) und beliebige Einträge, Zeilentags, snr oder Inschrift enthalten, statt nur entry+. Grund: Leere Zellen (<cell/>, 75× in den Rohdaten) und Zellen ohne entry-Wrapper führten zu Fehlern.
+entry  = ( `<entry>` § inscription `</entry>` | `<entry/>` ) prettyspace
+# Neu: leeres <entry/> erlaubt (136× in den Rohdaten). Das § für den Inhalt bleibt erhalten.
 
 translation    = `<translation>` prettyspace /[^<]+/ `</translation>` prettyspace
 
@@ -61,7 +71,8 @@ translation    = `<translation>` prettyspace /[^<]+/ `</translation>` prettyspac
 # Transcription Grammar ----
 #
 
-HIDE:inscription = ( inline | brackets )+
+HIDE:inscription = ( brackets | inline )+
+# Reihenfolge getauscht (brackets vor inline). Die Alternativen überschneiden sich am Anfang kaum, die Wirkung dürfte gering sein; die Motivation ist nicht sicher rekonstruierbar.
 HIDE:inline  = tags | insec | letters | terminator | binder | separator | ampersand | bidi | space
 
 
@@ -70,23 +81,37 @@ HIDE:inline  = tags | insec | letters | terminator | binder | separator | ampers
 #
 
 #HIDE:tags   = app | all | em | chr | sup | sub | nl
-HIDE:tags   = app | all | em | chr | sup | sub | tab | nl | b | versal | span | u
+HIDE:tags   = app | all | em | chr | sup | sub | tab | nl | b | versal | span | u | bdo | big | s
+# Neu: bdo, big und s ergänzt. Grund: Diese Inline-Tags kommen in den Rohdaten vor und führten zu Fehlern.
 
 
 HIDE:app    = appalpha | appnum
-appalpha    = `<appalpha id=` app_id `>` app_nr `</appalpha>`
-appnum      = `<appnum id=` app_id `>` app_nr `</appnum>`
-app_id      = /[^>]*/
+appalpha    = `<appalpha` app_other_attr* ~ `id=` app_id app_other_attr* `>` app_nr `</appalpha>`
+# Geändert: Zusätzliche Attribute vor und nach id= sind erlaubt. Grund: Fremdattribute führten zu einer AssertionError in move_app_id_to_attr (dioParser.py).
+appnum      = `<appnum` app_other_attr* ~ `id=` app_id app_other_attr* `>` app_nr `</appnum>`
+# Analog zu appalpha.
+DROP:app_other_attr = ~ !(`id=`) attr_name `=` `"` attr_value `"`
+# Neu: Fremdattribute werden verworfen (DROP), sodass im AST nur id= erhalten bleibt.
+app_id      = /"[^"]*"/
+# Geändert: Wert in Anführungszeichen, endet am schließenden ". Vorher /[^>]*/. Verhindert, dass Fremdattribute in den Wert geraten.
 app_nr      = /[^<]*/
 
-all         = `<lig>` (letters | brackets | space)+ `</lig>`
+all         = `<lig>` (inline | brackets)+ `</lig>`
+# Geändert: Inhalt jetzt inline | brackets statt letters | brackets | space. Grund: Ligaturen mit Satzzeichen, Tags oder Klammern führten zu Fehlern.
 em          = `<em>` inscription `</em>`
 chr         = `<chr>` letters space? `</chr>`
-sup         = `<sup>` /[^<]+/ `</sup>`
+sup         = `<sup` attribute* `>` /[^<]+/ `</sup>`
+# Geändert: <sup> darf Attribute haben. Grund: <sup> mit Attributen führte zu Fehlern.
+big         = `<big>` inscription `</big>`
+# Neu: <big> analog zu <em>. Grund: Tag in den Rohdaten (36×) war unbekannt.
+s           = `<s>` inscription `</s>`
+# Neu: <s> (Durchstreichung) analog zu <em>. Grund: Tag kommt in den Rohdaten vor und war unbekannt.
 
 versal      = `<versal>` /[^<]+/ `</versal>`
 
 span        = `<span` attribute* `>` span_content+ `</span>`
+bdo         = `<bdo` attribute* `>` (inline | brackets)+ `</bdo>`
+# Neu: <bdo> (Textrichtung) mit Attributen und Inline-Inhalt. Grund: 16× in den Rohdaten, vorher nicht definiert.
 HIDE:span_content = inline | brackets | stray_bracket
 HIDE:stray_bracket = /[\[\]()]/
 
@@ -100,7 +125,8 @@ u           = `<u>` inscription `</u>`
 
 sub         = `<sub>` letters space? `</sub>`
 
-tab          = `<tab>` ( app | span | em | insec | letters | terminator | binder | separator | space | brackets )+ `</tab>`
+tab          = ( `<tab>` ( inline | brackets )+ `</tab>` | `<tab/>` )
+# Geändert: Inhalt jetzt inline | brackets (statt einer Einzelliste), leeres <tab/> erlaubt (15× in den Rohdaten). Grund: Satzzeichen und Klammern im Tab-Inhalt sowie leere Tabs führten zu Fehlern.
 
 nl          = `<nl></nl>` | `<nl/>`
 
@@ -122,23 +148,34 @@ HIDE:insec_separator = wtr / ?(\u0323)/ ~
 
 letters = letters_range | letters_sequence
 
-HIDE:letters_sequence         = letters_plain | letters_extended | letters_hebrew | letters_greek | letters_diacrytic | letters_cross | letters_apostrophe | letters_brackets
+HIDE:letters_sequence         = letters_plain | letters_extended | letters_hebrew | letters_greek | letters_diacrytic | letters_cross | letters_apostrophe | letters_fraction | letters_brackets
+# Neu: letters_fraction ergänzt. Grund: Brüche ½ ¾ ¼ kommen in den Daten vor.
 HIDE:letters_range       = letters_sequence "-" letters_sequence
-HIDE:letters_plain       = /[A-Za-z0-9](?![\u0323\u0308\u0364])/+
-HIDE:letters_extended    = /[àèìòùÀÈÌÒÙáéíóúýÁÉÍÓÚÝâêîôûÂÊÎÔÛãñõÃÑÕäëïöüÿÄËÏÖÜŸçÇßØøÅåÆæœ](?!\u0323)/+
-HIDE:letters_hebrew = /[\u0591-\u05C7\u05D0-\u05EA\u05EF-\u05F4\uFB1D-\uFB36\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFB4F](?!\u0323)/+
-HIDE:letters_diacrytic   = /[A-Za-z][\u0308\u0364](?!\u0323)/+
+HIDE:letters_plain       = /(?:[A-Za-z0-9][\u0300-\u0322\u0324-\u036F]*)(?![\u0300-\u036F])/+
+# Geändert: Basisbuchstabe gefolgt von beliebig vielen kombinierenden Diakritika (U+0300–U+036F). U+0323 (Punkt darunter) bleibt außen vor, damit insec ihn verarbeitet. Grund: Diakritika (z. B. Diaerese) brachen die Buchstabenfolge ab.
+HIDE:letters_extended    = /(?:[àèìòùÀÈÌÒÙáéíóúýÁÉÍÓÚÝâêîôûÂÊÎÔÛãñõÃÑÕäëïöüÿÄËÏÖÜŸçÇßØøÅåÆæœēōčšžćńśźżěůřďťňăąęłįųėūīāĒŌČŠŽĆŃŚŹŻĚŮŘĎŤŇĂĄĘŁĮŲĖŪĪĀŭŬþÞðÐẺẻƆƗƒṯṮɉɈ][\u0300-\u0322\u0324-\u036F]*)(?![\u0300-\u036F])/+
+# Geändert: wie letters_plain (mit Diakritika) und um weitere Buchstaben ergänzt (u. a. ē, ō, č, š, ł, ę, ř, þ, ð, Ɔ, ṯ). Grund: Fehlende Zeichen in den Daten.
+HIDE:letters_hebrew = /(?:[\u0591-\u05C7\u05D0-\u05EA\u05EF-\u05F4\uFB1D-\uFB36\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFB4F][\u0300-\u0322\u0324-\u036F]*)(?![\u0300-\u036F])/+
+# Geändert: Hebräische Buchstaben dürfen Diakritika tragen (wie letters_plain).
+HIDE:letters_diacrytic   = /[A-Za-z]̈(?!\u0323)/+
+# Geändert: Nur noch Diaerese (U+0308) als eigenes Zeichen. U+0364 ist jetzt in letters_plain enthalten; da letters_plain in der Auswahl früher steht, ist diese Alternative faktisch redundant.
 HIDE:letters_cross       = /[+†]/
-HIDE:letters_greek       = /[\u0370-\u0386\u0388-\u03FF\u1F00-\u1FFF](?!\u0323)/+
-HIDE:letters_apostrophe  =  /['’]/
+HIDE:letters_greek       = /(?:[\u0370-\u0386\u0388-\u03FF\u1F00-\u1FFF][\u0300-\u0322\u0324-\u036F]*)(?![\u0300-\u036F])/+
+# Geändert: Griechische Buchstaben dürfen Diakritika tragen (wie letters_plain).
+HIDE:letters_apostrophe  = "'" | "’" | "‘" | "‚"
+# Geändert: Von Regex auf Literal-Alternativen umgestellt; ‘ (U+2018) und ‚ (U+201A) ergänzt. Grund: Weitere Apostrophvarianten in den Daten.
+HIDE:letters_fraction    = /[½¾¼]/
+# Neu: Brüche ½ ¾ ¼. Grund: Kommen in den Daten vor und führten zu Fehlern.
 
-HIDE:letters_brackets  =  /[〈 〉]/
+HIDE:letters_brackets  =  " "
+# Geändert: Nur noch Leerzeichen. 〈 und 〉 wurden nach add verschoben; vorher verschluckte letters_brackets das schließende 〉 bei 〈---〉. Das Geviertspatium (U+2003) wird jetzt über space bzw. prettyspace abgedeckt.
 
 #
 # Terminators ----
 #
 
-terminator = /(?<!\s)[\.:,;?!?]/
+terminator = /(?<!\s)[\.:,]/ | /[;!?]/
+# Geändert: ; ! ? stehen in einer eigenen Alternative ohne Lookbehind. Vermutlich, weil diese Zeichen auch nach Leerzeichen vorkommen (z. B. " ?"), was vorher nicht erkannt wurde.
 
 #
 # Binders ----
@@ -147,7 +184,8 @@ terminator = /(?<!\s)[\.:,;?!?]/
 binder = binder_equal | binder_hyphen
 
 HIDE:binder_equal  = "="
-HIDE:binder_hyphen  = /(?<!-)-(?!-)/
+HIDE:binder_hyphen  = /(?<!-)-(?!-)|(?<!–)[–—](?!–)/
+# Erweitert um – (U+2013) und — (U+2014). Die Lookarounds verhindern, dass Folgen wie ––– (unbekannte Lücke) als Binder gelesen werden.
 
 #
 # Separators ----
@@ -162,18 +200,23 @@ ampersand    = /&amp;/ | /&(?!(?:lt|gt);)/
 
 # Moved to attribute value in AST
 
-sep_word_dot           = ~"·"~ | ~"·"~ | ~"∙"~
-sep_word_period        = ~"."~ #
-sep_word_colon         = ~":"~
+sep_word_dot           = prettyspace ( "·" | "·" | "∙" | "•" | "▪" | "✶" | "∗" | "⋆" ) ~
+# Geändert: Optionales Whitespace/Zeilenumbruch davor (prettyspace); Symbolvarianten • ▪ ✶ ∗ ⋆ ergänzt. Grund: Trenner am Zeilenanfang schlugen fehl. Das · kommt absichtlich zweimal vor (U+00B7 und U+0387).
+sep_word_period        = prettyspace "." ~ #
+# Geändert: prettyspace davor. Grund: Punkt am Zeilenanfang wurde nicht erkannt.
+sep_word_colon         = prettyspace ":" ~
+# Geändert: prettyspace davor. Grund: Doppelpunkt am Zeilenanfang wurde nicht erkannt.
 sep_word_comma         = ~","~
 sep_word_equal         = /(?<!\s)=(?!\s)/
 
-z = sep_field | sep_line | sep_bar
+z = sep_field | sep_line
+# Geändert: sep_bar (┃) entfernt. Achtung: ┃ kommt in den Rohdaten 40× vor (in <lno>-Zeilen) und wird jetzt nicht mehr erkannt. Die Motivation ist nicht rekonstruierbar.
 
 # Moved to attribute value in AST
-sep_field          = ~"//"~
-sep_line          = ~"/"~
-sep_bar = ~"┃"~
+sep_field          = prettyspace "//" ~
+# Geändert: prettyspace davor. Grund: // am Zeilenanfang wurde nicht erkannt.
+sep_line           = prettyspace "/" ~
+# Geändert: prettyspace davor. Grund: / am Zeilenanfang wurde nicht erkannt.
 
 
 #
@@ -185,7 +228,8 @@ HIDE:brackets =  abr | deletion | cpl | add
 abr             = `(` inline+ `)`
 deletion        = `[` lost `]` # Renamed to del in AST
 cpl             = `[` (tags | deletion_nested | inline |  brackets)+ `]`
-add             = (`&lt;` | `⟨` ) (tags | deletion_nested | inline | brackets)+ (`&gt;`|`⟩`)
+add             = (`&lt;` | `⟨` | `〈` | `〈` | `‹` ) (tags | deletion_nested | inline | brackets)+ (`&gt;` | `⟩` | `〉` | `〉` | `›`)
+# Geändert: Zusätzliche Varianten 〈…〉 (U+2329/U+232A und U+3008/U+3009) und ‹…› (U+2039/U+203A). Grund: Spitze Klammern in den Daten; diese Varianten wurden zuvor von letters_brackets verschluckt.
 
 deletion_nested = lost         # Renamed to del in AST
 
@@ -198,7 +242,8 @@ HIDE:known           = "."+
 #
 
 space        = /\s/~ ! separator
-DROP:prettyspace  = /[\r\n ]*/ | /[\n ]*/
+DROP:prettyspace  = /[\r\n \u2002\u2003\u2009]*/
+# Geändert: EN SPACE (U+2002), EM SPACE (U+2003) und THIN SPACE (U+2009) ergänzt. Die zweite Alternative `/[\n ]*/` aus devel entfällt, sie war durch die erste bereits abgedeckt. Grund: Geviert- und Spatien-Zeichen in den Daten (z. B. 〈   〉) sollen als Leerraum gelten.
 DROP:EOF    =  !/./
 
 HIDE:bidi    = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]+/
