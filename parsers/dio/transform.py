@@ -52,11 +52,9 @@ for idx, row in regs.iterrows():
 
 #%% Save test cases for dio sco
 
-tests = ""
-for idx, row in df.iterrows():
-    inscription = str(row['content']).strip()
-    tests += f"\nC{str(row['case'])}: "
-    tests += '"""' + inscription + '"""'
+tests = "".join(
+    f'\nC{row["case"]}: """{str(row["content"]).strip()}"""' for _, row in df.iterrows()
+)
 
 outputname = Path(filename).stem
 with open(DIO_ROOT / "tests" / f"{outputname}.ini", "w", encoding="utf-8") as file:
