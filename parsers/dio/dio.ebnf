@@ -27,7 +27,7 @@
 document       = sco+ §EOF
 
 sco            = prettyspace `<sco>` prettyspace sec+ `</sco>` prettyspace translation?
-sec            = `<sec>` prettyspace ( snt | snr )* ( par translation? )* `</sec>` prettyspace
+sec            = `<sec>` prettyspace ( snt | snr )* ( ( par | pin ) translation? )* `</sec>` prettyspace
 
 #snr            = `<snr>` /[A-Z0-9]+/ "."? letters_cross? prettyspace `</snr>` prettyspace
 #snr         = `<snr>` /[^<]+/ `</snr>` prettyspace
@@ -39,11 +39,14 @@ snt            = `<snt>` (prettyspace (b | span_txt) prettyspace | /[^<]+/) `</s
 
 b              = `<b>` ( prettyspace versal prettyspace | /[^<]+/ ) `</b>`
 
-par            = `<par>` prettyspace (lno | lin | lce | table)+ `</par>` prettyspace
+par            = `<par>` prettyspace (lno | lin | lce | table | pin)+ `</par>` prettyspace
 
 lno            = `<lno>` cnt? § inscription `</lno>` prettyspace
 lin            = `<lin>` cnt? § inscription `</lin>` prettyspace
 lce            = `<lce>` § inscription `</lce>` prettyspace
+
+lou            = `<lou>` § inscription `</lou>` prettyspace
+pin            = `<pin>` prettyspace ( lno | lin | lce | lou | inscription )+ `</pin>` prettyspace
 
 cnt            = `<cnt>` /[0-9]+/ `</cnt>`
 
@@ -77,7 +80,7 @@ app_id      = /[^>]*/
 app_nr      = /[^<]*/
 
 all         = `<lig>` (letters | brackets | space)+ `</lig>`
-em          = `<em>` letters space? `</em>`
+em          = `<em>` inscription `</em>`
 chr         = `<chr>` letters space? `</chr>`
 sup         = `<sup>` /[^<]+/ `</sup>`
 
@@ -97,7 +100,7 @@ u           = `<u>` inscription `</u>`
 
 sub         = `<sub>` letters space? `</sub>`
 
-tab          = `<tab>` ( app | span | insec | letters | terminator | binder | separator | space | brackets )+ `</tab>`
+tab          = `<tab>` ( app | span | em | insec | letters | terminator | binder | separator | space | brackets )+ `</tab>`
 
 nl          = `<nl></nl>` | `<nl/>`
 
@@ -121,13 +124,13 @@ letters = letters_range | letters_sequence
 
 HIDE:letters_sequence         = letters_plain | letters_extended | letters_hebrew | letters_greek | letters_diacrytic | letters_cross | letters_apostrophe | letters_brackets
 HIDE:letters_range       = letters_sequence "-" letters_sequence
-HIDE:letters_plain       = /[A-Za-z0-9](?!\u0323)/+
+HIDE:letters_plain       = /[A-Za-z0-9](?![\u0323\u0308\u0364])/+
 HIDE:letters_extended    = /[àèìòùÀÈÌÒÙáéíóúýÁÉÍÓÚÝâêîôûÂÊÎÔÛãñõÃÑÕäëïöüÿÄËÏÖÜŸçÇßØøÅåÆæœ](?!\u0323)/+
 HIDE:letters_hebrew = /[\u0591-\u05C7\u05D0-\u05EA\u05EF-\u05F4\uFB1D-\uFB36\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFB4F](?!\u0323)/+
-HIDE:letters_diacrytic   = /[A-Za-z]̈(?!\u0323)/+
+HIDE:letters_diacrytic   = /[A-Za-z][\u0308\u0364](?!\u0323)/+
 HIDE:letters_cross       = /[+†]/
 HIDE:letters_greek       = /[\u0370-\u0386\u0388-\u03FF\u1F00-\u1FFF](?!\u0323)/+
-HIDE:letters_apostrophe  =  "'"
+HIDE:letters_apostrophe  =  /['’]/
 
 HIDE:letters_brackets  =  /[〈 〉]/
 
@@ -135,7 +138,7 @@ HIDE:letters_brackets  =  /[〈 〉]/
 # Terminators ----
 #
 
-terminator = /(?<!\s)[\.:,;]/
+terminator = /(?<!\s)[\.:,;?!?]/
 
 #
 # Binders ----
@@ -165,11 +168,12 @@ sep_word_colon         = ~":"~
 sep_word_comma         = ~","~
 sep_word_equal         = /(?<!\s)=(?!\s)/
 
-z = sep_field | sep_line
+z = sep_field | sep_line | sep_bar
 
 # Moved to attribute value in AST
 sep_field          = ~"//"~
 sep_line          = ~"/"~
+sep_bar = ~"┃"~
 
 
 #
